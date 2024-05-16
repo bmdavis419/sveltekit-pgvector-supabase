@@ -1,6 +1,6 @@
 # vectors, sveltekit, supabase, and the ai sdk
 
-_still a work in progress, I'll delete this when I'm done_
+_still a work in progress, I'll delete this line when I'm done_
 
 ## what is this?
 
@@ -22,3 +22,9 @@ create/query them.
 2. install packages with `bun install`
 3. run `supabase start`
 4. run `bun run dev`
+
+## important docs for reference
+
+- [pgvector](https://github.com/pgvector/pgvector)
+- [supabase pgvector small example](https://supabase.com/docs/guides/database/extensions/pgvector?queryGroups=database-method&database-method=sql)
+- [ai sdk openai embeddings](https://sdk.vercel.ai/providers/ai-sdk-providers/openai#embedding-models)
