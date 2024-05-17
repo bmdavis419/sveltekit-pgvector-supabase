@@ -10,6 +10,24 @@
 	import type { ActionResult } from '@sveltejs/kit';
 	import type { SubmitFunction } from './$types';
 	import type { ActionData } from './$types';
+	import * as Command from '$lib/components/ui/command';
+
+	let openDialog = $state(false);
+
+	$effect(() => {
+		function handleKeydown(e: KeyboardEvent) {
+			if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+				e.preventDefault();
+				openDialog = !openDialog;
+			}
+		}
+
+		document.addEventListener('keydown', handleKeydown);
+
+		return () => {
+			document.removeEventListener('keydown', handleKeydown);
+		};
+	});
 
 	let searchResults = $state<
 		{
@@ -48,10 +66,22 @@
 	};
 
 	let customSearchQuery = $state('');
+	let customDialogQuery = $state('');
 
 	$effect(() => {
 		if (customSearchQuery !== '') {
 			customSearch(customSearchQuery);
+		} else {
+			if (timeoutId) {
+				clearTimeout(timeoutId);
+			}
+			searchResults = [];
+		}
+	});
+
+	$effect(() => {
+		if (customDialogQuery !== '') {
+			customSearch(customDialogQuery);
 		} else {
 			if (timeoutId) {
 				clearTimeout(timeoutId);
@@ -87,6 +117,19 @@
 		};
 	};
 </script>
+
+<Command.Dialog bind:open={openDialog}>
+	<Command.Input placeholder="search for an exercise" bind:value={customSearchQuery} />
+	<Command.List>
+		<Command.Group heading="Exercises">
+			{#each searchResults as exercise}
+				<Command.Item on:click={() => console.log(exercise)}>
+					{exercise.name}
+				</Command.Item>
+			{/each}
+		</Command.Group>
+	</Command.List>
+</Command.Dialog>
 
 <main class="flex min-h-screen w-full flex-col items-center justify-center gap-4">
 	<Card class="w-[350px]">
@@ -142,5 +185,8 @@
 				<Button type="submit" disabled={isSeeding}>seed the db</Button>
 			</form>
 		</CardFooter>
+	</Card>
+	<Card class="w-[350px]">
+		<CardHeader>press cmd + k for something neat</CardHeader>
 	</Card>
 </main>
