@@ -1,7 +1,5 @@
 # vectors, sveltekit, supabase, and the ai sdk
 
-_still a work in progress, I'll delete this line when I'm done_
-
 ## what is this?
 
 This is a demo of a simple app which uses the AI SDK, Supabase, and SvelteKit to

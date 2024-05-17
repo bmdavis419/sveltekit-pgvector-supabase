@@ -1,11 +1,45 @@
 import { openaiEmbedding } from "$lib/ai";
 import { db } from "$lib/db";
+import { exercises } from "$lib/db/schema";
+import { error } from "@sveltejs/kit";
 import { embed } from "ai";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { zfd } from "zod-form-data";
 
 export const actions = {
-  default: async ({ locals }) => {
-    const exercises = [
+  search: async ({ request }) => {
+    const data = await request.formData();
+
+    const schema = zfd.formData({
+      query: zfd.text(),
+    });
+
+    const res = schema.safeParse(data);
+
+    if (!res.success) {
+      error(400, res.error.name);
+    }
+
+    const { embedding } = await embed({
+      model: openaiEmbedding,
+      value: res.data.query,
+    });
+
+    const dbExercises = await db.select({
+      name: exercises.name,
+      id: exercises.id,
+    }).from(exercises).orderBy(sql`name_embedding <=> ${
+      JSON.stringify(
+        embedding,
+      )
+    }`).limit(3);
+
+    return {
+      dbExercises,
+    };
+  },
+  seed: async ({ locals }) => {
+    const exercisesSeedList = [
       "Bench",
       "Tricep Pushdown",
       "Incline Bench",
@@ -13,21 +47,32 @@ export const actions = {
       "Shoulder Lateral Raise",
     ];
 
-    for (let i = 0; i < exercises.length; i++) {
+    // check if the db is already seeded
+    const curEx = await db.query.exercises.findFirst({
+      where: eq(exercises.name, "Bench"),
+    });
+
+    if (curEx) {
+      return {
+        status: "skipped, already seeded",
+      };
+    }
+
+    for (let i = 0; i < exercisesSeedList.length; i++) {
       const { embedding } = await embed({
         model: openaiEmbedding,
-        value: exercises[i],
+        value: exercisesSeedList[i],
       });
 
       // insert into db
       await locals.supabase.from("exercises").insert({
-        name: exercises[i],
+        name: exercisesSeedList[i],
         name_embedding: JSON.stringify(embedding),
       });
     }
 
     return {
-      success: true,
+      status: "seeded",
     };
   },
 };
@@ -38,13 +83,26 @@ export const load = async () => {
     value: "Steak",
   });
 
+  // without type safety
   const res = await db.execute(
     sql`SELECT id, name FROM exercises ORDER BY name_embedding <=> ${
       JSON.stringify(embedding)
-    } LIMIT 1;`,
+    } LIMIT 3;`,
   );
 
   console.log(res);
+
+  // with type safety
+  const newRes = await db.select({
+    name: exercises.name,
+    id: exercises.id,
+  }).from(exercises).orderBy(sql`name_embedding <=> ${
+    JSON.stringify(
+      embedding,
+    )
+  }`).limit(3);
+
+  console.log(newRes);
 
   return {
     success: true,
