@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { applyAction, deserialize, enhance } from '$app/forms';
+	import { deserialize, enhance } from '$app/forms';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { Card } from '$lib/components/ui/card';
 	import CardContent from '$lib/components/ui/card/card-content.svelte';
@@ -65,6 +65,42 @@
 		}, 500);
 	};
 
+	let dialogSearchResults = $state<
+		{
+			name: string;
+			id: string;
+		}[]
+	>([]);
+
+	let dialogTimeoutId = $state<NodeJS.Timeout | null>(null);
+
+	const dialogCustomSearch = async (query: string) => {
+		dialogTimeoutId = setTimeout(async () => {
+			if (dialogTimeoutId) {
+				clearTimeout(dialogTimeoutId);
+			}
+
+			const data = new FormData();
+
+			data.append('query', query);
+
+			const response = await fetch('?/search', {
+				method: 'POST',
+				body: data
+			});
+
+			const result: ActionResult = deserialize(await response.text());
+
+			// idk how I feel about all these types being needed here, to be revisited...
+			if (result.type === 'success') {
+				const resData = result.data as ActionData;
+				if (resData && 'dbExercises' in resData && resData.dbExercises) {
+					dialogSearchResults = resData.dbExercises;
+				}
+			}
+		}, 500);
+	};
+
 	let customSearchQuery = $state('');
 	let customDialogQuery = $state('');
 
@@ -81,14 +117,16 @@
 
 	$effect(() => {
 		if (customDialogQuery !== '') {
-			customSearch(customDialogQuery);
+			dialogCustomSearch(customDialogQuery);
 		} else {
-			if (timeoutId) {
-				clearTimeout(timeoutId);
+			if (dialogTimeoutId) {
+				clearTimeout(dialogTimeoutId);
 			}
-			searchResults = [];
+			dialogSearchResults = [];
 		}
 	});
+
+	$inspect(searchResults);
 
 	let isSeeding = $state(false);
 	let isButtonSearching = $state(false);
@@ -119,10 +157,10 @@
 </script>
 
 <Command.Dialog bind:open={openDialog}>
-	<Command.Input placeholder="search for an exercise" bind:value={customSearchQuery} />
+	<Command.Input placeholder="search for an exercise" bind:value={customDialogQuery} />
 	<Command.List>
 		<Command.Group heading="Exercises">
-			{#each searchResults as exercise}
+			{#each dialogSearchResults as exercise}
 				<Command.Item on:click={() => console.log(exercise)}>
 					{exercise.name}
 				</Command.Item>
