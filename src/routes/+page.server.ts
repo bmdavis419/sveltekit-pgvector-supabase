@@ -36,6 +36,8 @@ export const actions = {
 
     return {
       dbExercises,
+      // we return the query to use it as a value in the form
+      query: res.data.query,
     };
   },
   seed: async ({ locals }) => {

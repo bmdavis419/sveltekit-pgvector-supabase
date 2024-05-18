@@ -1,18 +1,21 @@
 <script lang="ts">
-	import { deserialize, enhance } from '$app/forms';
+	import { applyAction, deserialize, enhance } from '$app/forms';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { Card } from '$lib/components/ui/card';
 	import CardContent from '$lib/components/ui/card/card-content.svelte';
 	import CardFooter from '$lib/components/ui/card/card-footer.svelte';
 	import CardHeader from '$lib/components/ui/card/card-header.svelte';
+	import * as Command from '$lib/components/ui/command';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import { Label } from '$lib/components/ui/label';
 	import type { ActionResult } from '@sveltejs/kit';
-	import type { SubmitFunction } from './$types';
-	import type { ActionData } from './$types';
-	import * as Command from '$lib/components/ui/command';
+	import type { ActionData, SubmitFunction } from './$types';
 
 	let openDialog = $state(false);
+
+	// instead of manually deserializing the results we can just use the native
+	// form prop that contain that data
+	const { form } = $props();
 
 	$effect(() => {
 		function handleKeydown(e: KeyboardEvent) {
@@ -29,41 +32,13 @@
 		};
 	});
 
-	let searchResults = $state<
-		{
-			name: string;
-			id: string;
-		}[]
-	>([]);
+	// searchResults then become just a derived for the result of
+	// form...if no form we fallback to empty array
+	let searchResults = $derived(form?.dbExercises ?? []);
 
-	let timeoutId = $state<NodeJS.Timeout | null>(null);
-
-	const customSearch = async (query: string) => {
-		timeoutId = setTimeout(async () => {
-			if (timeoutId) {
-				clearTimeout(timeoutId);
-			}
-
-			const data = new FormData();
-
-			data.append('query', query);
-
-			const response = await fetch('?/search', {
-				method: 'POST',
-				body: data
-			});
-
-			const result: ActionResult = deserialize(await response.text());
-
-			// idk how I feel about all these types being needed here, to be revisited...
-			if (result.type === 'success') {
-				const resData = result.data as ActionData;
-				if (resData && 'dbExercises' in resData && resData.dbExercises) {
-					searchResults = resData.dbExercises;
-				}
-			}
-		}, 500);
-	};
+	// this doesn't need to be a state since we don't use it in any effect
+	// or UI
+	let timeoutId: ReturnType<typeof setTimeout>;
 
 	let dialogSearchResults = $state<
 		{
@@ -72,7 +47,8 @@
 		}[]
 	>([]);
 
-	let dialogTimeoutId = $state<NodeJS.Timeout | null>(null);
+	// same for this
+	let dialogTimeoutId: ReturnType<typeof setTimeout>;
 
 	const dialogCustomSearch = async (query: string) => {
 		dialogTimeoutId = setTimeout(async () => {
@@ -101,19 +77,7 @@
 		}, 500);
 	};
 
-	let customSearchQuery = $state('');
 	let customDialogQuery = $state('');
-
-	$effect(() => {
-		if (customSearchQuery !== '') {
-			customSearch(customSearchQuery);
-		} else {
-			if (timeoutId) {
-				clearTimeout(timeoutId);
-			}
-			searchResults = [];
-		}
-	});
 
 	$effect(() => {
 		if (customDialogQuery !== '') {
@@ -154,6 +118,9 @@
 			isButtonSearching = false;
 		};
 	};
+
+	// we store the input in a variable to be able to refocus automatically
+	let input: HTMLInputElement;
 </script>
 
 <Command.Dialog bind:open={openDialog}>
@@ -191,13 +158,50 @@
 				this implementation is more useful in the real world probably
 			</p>
 			<div class="relative">
-				<Label>query</Label>
-				<Input
-					name="query"
-					bind:value={customSearchQuery}
-					placeholder="search for an exercise"
-					class="relative"
-				></Input>
+				<!-- 
+					we just use a native form to submit the query...this 
+					means that is the user doesn't have javascript can still
+					submit pressing enter 😎
+				-->
+				<form
+					action="?/search"
+					method="post"
+					use:enhance={() => {
+						return ({ result }) => {
+							// if the return type is success
+							if (result.type === 'success') {
+								// we apply the action (this prevent the input from being deleted on any submit)
+								applyAction(result);
+								// this is weird i know but we need to wait a bit to refocus
+								// or we will not be able to write...this is sometimes noticeable but just
+								// barely and the experience is still smooth.
+								setTimeout(() => {
+									input?.focus();
+								}, 10);
+							}
+						};
+					}}
+				>
+					<Label>query</Label>
+					<Input
+						name="query"
+						value={form?.query ?? ''}
+						on:input={(e) => {
+							// on input we write our debounce and if the debounce
+							// is successful we request the submit of the form
+							clearTimeout(timeoutId);
+							input = e.currentTarget;
+							if (input.value) {
+								const form = input.form;
+								timeoutId = setTimeout(() => {
+									form?.requestSubmit();
+								}, 500);
+							}
+						}}
+						placeholder="search for an exercise"
+						class="relative"
+					></Input>
+				</form>
 				{#if searchResults.length > 0}
 					<div
 						class="absolute left-0 top-16 flex w-full flex-col rounded-md bg-white p-2 shadow-md"
