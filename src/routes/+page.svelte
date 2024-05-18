@@ -167,17 +167,16 @@
 					action="?/search"
 					method="post"
 					use:enhance={() => {
-						return ({ result }) => {
+						return async ({ result }) => {
 							// if the return type is success
 							if (result.type === 'success') {
+								// we set autofocus to true so that applyAction will focus on the input allowing for
+								// seamless search
+								input.autofocus = true;
 								// we apply the action (this prevent the input from being deleted on any submit)
-								applyAction(result);
-								// this is weird i know but we need to wait a bit to refocus
-								// or we will not be able to write...this is sometimes noticeable but just
-								// barely and the experience is still smooth.
-								setTimeout(() => {
-									input?.focus();
-								}, 10);
+								await applyAction(result);
+								// we set autofocus to false to avoid annoying anti-a11y auto-focusing
+								input.autofocus = false;
 							}
 						};
 					}}
