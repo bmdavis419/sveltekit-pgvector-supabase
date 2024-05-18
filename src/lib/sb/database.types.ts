@@ -52,6 +52,30 @@ export type Database = {
         }
         Relationships: []
       }
+      insiderviz_testing: {
+        Row: {
+          cik: string
+          id: string
+          name: string
+          name_embedding: string | null
+          type: string
+        }
+        Insert: {
+          cik: string
+          id?: string
+          name: string
+          name_embedding?: string | null
+          type: string
+        }
+        Update: {
+          cik?: string
+          id?: string
+          name?: string
+          name_embedding?: string | null
+          type?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
